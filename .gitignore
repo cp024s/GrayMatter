@@ -1,0 +1,123 @@
+# ============================================================
+# Hardware Trojan Detection — .gitignore
+# ============================================================
+
+# ----------------------------
+# Python
+# ----------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+
+# ----------------------------
+# Python data artifacts
+# ----------------------------
+*.csv
+*.pkl
+*.pickle
+*.npy
+*.npz
+
+# ----------------------------
+# Simulation outputs
+# ----------------------------
+activity/vcd/*
+activity/saif/*
+activity/parsed/*
+sim/logs/*
+
+# Keep directory structure
+!activity/vcd/.gitkeep
+!activity/saif/.gitkeep
+!activity/parsed/.gitkeep
+!sim/logs/.gitkeep
+
+# ----------------------------
+# Vivado generated files
+# ----------------------------
+*.jou
+*.log
+*.str
+*.pb
+*.wdb
+*.dcp
+*.rpt
+*.xml
+*.hw
+*.cache/
+*.runs/
+*.sim/
+*.ip_user_files/
+*.xpr
+*.sdk/
+
+# ----------------------------
+# Icarus / Verilog simulation
+# ----------------------------
+*.vvp
+*.vcd
+*.fst
+*.lxt
+*.out
+
+# ----------------------------
+# Waveform viewers
+# ----------------------------
+*.gtkw
+*.wlf
+
+# ----------------------------
+# Results (generated artifacts)
+# ----------------------------
+results/plots/*
+results/tables/*
+results/summaries/*
+
+# Keep result directories
+!results/plots/.gitkeep
+!results/tables/.gitkeep
+!results/summaries/.gitkeep
+
+# ----------------------------
+# Temporary experiment outputs
+# ----------------------------
+experiments/**/output/*
+experiments/**/logs/*
+experiments/**/temp/*
+
+# ----------------------------
+# OS / Editor noise
+# ----------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+
+# ----------------------------
+# IDEs
+# ----------------------------
+.vscode/
+.idea/
+*.code-workspace
+
+# ----------------------------
+# Archive / scratch
+# ----------------------------
+archive/
+scratch/
+
+
+# ----------------------------
+# Ignore all files in the archive directory
+# ----------------------------
+/archive/
+/archive/*
