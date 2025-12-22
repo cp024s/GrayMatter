@@ -1,0 +1,82 @@
+# ============================================================
+# Monte Carlo Sampling Configuration
+# ============================================================
+# This file defines HOW statistical evidence is collected.
+# It does NOT define detection logic or thresholds.
+# ============================================================
+
+# ------------------------------------------------------------
+# Sampling control
+# ------------------------------------------------------------
+
+# Number of independent simulation samples per batch.
+# Each sample corresponds to one simulation run producing
+# one switching-activity observation X_i.
+batch_size: 100
+
+# Maximum number of batches to run if convergence is not reached.
+# Acts as a safety bound to avoid infinite sampling.
+max_batches: 200
+
+
+# ------------------------------------------------------------
+# Convergence criteria
+# ------------------------------------------------------------
+
+# Tolerance for declaring convergence of the mean (μ).
+# Convergence condition:
+#   |μ_k - μ_(k-1)| < mean_eps
+mean_eps: 1.0e-3
+
+# Tolerance for declaring convergence of the variance (σ²).
+# Convergence condition:
+#   |σ²_k - σ²_(k-1)| < var_eps
+var_eps: 1.0e-3
+
+# Number of consecutive batches that must satisfy
+# both mean and variance convergence criteria.
+# Prevents false convergence due to noise.
+stable_batches: 5
+
+
+# ------------------------------------------------------------
+# Randomness and reproducibility
+# ------------------------------------------------------------
+
+# Base random seed used for stimulus generation and
+# any stochastic processes in the simulation backend.
+# This value must be logged and overridable via CLI.
+random_seed: 42
+
+
+# ------------------------------------------------------------
+# Observation window
+# ------------------------------------------------------------
+
+# Number of clock cycles over which switching activity
+# is measured per simulation sample.
+# This value must remain FIXED across all experiments.
+observation_cycles: 1000
+
+
+# ------------------------------------------------------------
+# Normalization
+# ------------------------------------------------------------
+
+# Defines how raw switching activity is normalized.
+# Supported modes:
+#   - per_cycle   : activity / observation_cycles
+#   - raw         : no normalization
+normalization: per_cycle
+
+
+# ------------------------------------------------------------
+# Logging and diagnostics
+# ------------------------------------------------------------
+
+# Enable detailed logging of Monte Carlo progress.
+# Logs include batch index, μ, σ², and convergence status.
+enable_logging: true
+
+# Frequency (in batches) at which progress is logged.
+log_interval: 1
