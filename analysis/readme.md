@@ -1,166 +1,222 @@
-# `analysis/` — Statistical Analysis and Inference Layer
+# `analysis/` — Statistical Analysis Layer
 
-This directory implements the **analysis layer** of the hardware Trojan detection framework.
-Its responsibility is to convert **raw switching activity measurements** into **statistically meaningful conclusions**, without any dependence on RTL structure, simulator internals, or Trojan knowledge.
+## Overview
 
-The analysis layer is deliberately separated from simulation and RTL to enforce **methodological correctness** and **reproducibility**.
+The `analysis/` directory implements the **statistical analysis layer** of the project.
+Its role is to transform **raw internal switching activity** obtained from simulation into **quantitative statistical evidence** that can be used for anomaly detection.
 
----
+This layer sits **between simulation and detection**:
 
-## Scope and Role
+```
+Simulation → Switching Activity → Analysis → Statistical Evidence → Detection
+```
 
-The `analysis/` directory answers the following technical questions:
-
-1. **What numerical observable represents circuit switching behavior?**
-2. **How do we collect enough samples to model normal behavior reliably?**
-3. **When can sampling be stopped without compromising statistical validity?**
-
-This layer does **not**:
-
-* simulate RTL
-* parse VCD or SAIF files
-* decide whether a Trojan exists
-* tune detection thresholds
-
-It provides **quantitative evidence**, not verdicts.
+The analysis layer does **not** simulate RTL, trigger Trojans, or inspect design structure.
+It operates purely on **measured behavior**.
 
 ---
 
-## Architectural Overview
+## Why This Layer Exists
 
-At a high level, the analysis flow implemented here is:
+Hardware Trojans are often:
+
+* functionally silent
+* rarely triggered
+* invisible to output-based verification
+
+However, **internal switching activity always exists**, even when malicious logic is dormant.
+
+The analysis layer exists to answer one question:
+
+> **Is the observed internal behavior statistically consistent with a known-clean design?**
+
+This is a statistical question, not a functional one.
+
+---
+
+## Core Concept
+
+### Behavior as a Random Variable
+
+Each simulation run produces a different internal activity profile due to:
+
+* randomized stimulus
+* state evolution
+* timing interactions
+
+We model switching activity as a random variable:
+
+```
+X = switching activity metric from one simulation run
+```
+
+Analysis does **not** reason about a single value of `X`.
+It reasons about the **distribution of X**.
+
+---
+
+## Baseline Modeling
+
+For a clean design, repeated sampling yields a baseline distribution:
+
+```
+X ~ D0(μ0, σ0²)
+```
+
+where:
+
+* `μ0` is the mean switching activity
+* `σ0²` is the natural variance
+
+This baseline represents **normal internal behavior**, including noise and benign variation.
+
+All later analysis compares observations **against this baseline**.
+
+---
+
+## High-Level Flow
 
 ```
 Parsed switching activity
         ↓
- Metric computation (X)
+Metric computation (X)
         ↓
- Monte Carlo sampling
+Monte Carlo sampling
         ↓
- Convergence validation
+Convergence validation
         ↓
- Baseline statistics (μ, σ²)
+Baseline model (μ, σ²)
+        ↓
+Hypothesis evaluation
+        ↓
+Detection evidence
 ```
 
-Each module in this directory is responsible for **exactly one stage** of this flow.
+Each stage is implemented in a **separate module** to enforce correctness and reproducibility.
 
 ---
 
-## Module Breakdown
+## Directory Structure and Responsibilities
 
-### 1. `metrics/toggle_metric.py`
+### `metrics/`
 
-**Purpose:**
-Defines the primary **observable** used in the project.
+**Purpose:** Define *what is measured*.
 
-**Responsibility:**
-Convert parsed switching activity from a single simulation run into a **scalar metric** ( X ).
+* Converts parsed switching activity into a scalar metric `X`
+* No statistics
+* No thresholds
+* No Trojan assumptions
 
-**Key characteristics:**
+Primary metric used:
 
-* Pure function (no side effects)
-* Tool-agnostic (VCD / SAIF independent)
-* No statistical logic
-* No thresholds or decisions
+```
+X = total_toggles / observation_cycles
+```
 
-**Conceptually:**
-[
-X = \frac{\text{total signal toggles}}{\text{observation cycles}}
-]
-
-This definition is intentionally simple and transparent, allowing later extensions (e.g., entropy-based or region-based metrics) without modifying downstream logic.
+This abstraction enables statistical modeling while remaining tool-agnostic.
 
 ---
 
-### 2. `monte_carlo/convergence.py`
+### `monte_carlo/`
 
-**Purpose:**
-Determine **when enough samples have been collected** to trust baseline estimates.
+**Purpose:** Define *how sampling is performed*.
 
-**Responsibility:**
-Track convergence of:
+* Executes repeated sampling of `X`
+* Uses batch-based Monte Carlo sampling
+* Prevents arbitrary sample counts
 
-* running mean ( \mu )
-* running variance ( \sigma^2 )
+#### Convergence
 
-using tolerance-based stability criteria.
+Sampling stops only when **both mean and variance stabilize**:
 
-**Key characteristics:**
+```
+|μk − μk−1| < εμ
+|σk² − σk−1²| < εσ
+```
 
-* Incremental statistics (numerically stable)
-* Explicit convergence conditions
-* Requires consecutive stability to avoid false convergence
-* Independent of how samples are generated
+for multiple consecutive batches.
 
-This module formalizes the question:
-
-> *“Has additional sampling stopped providing new information?”*
+This ensures the baseline is statistically reliable.
 
 ---
 
-### 3. `monte_carlo/mc_engine.py`
+### `statistics/`
 
-**Purpose:**
-Orchestrate **Monte Carlo sampling** in a controlled, reproducible manner.
+**Purpose:** Define *how normal behavior is represented and validated*.
 
-**Responsibility:**
+#### Baseline Model
 
-* Load sampling configuration
-* Invoke simulation backends
-* Compute observables using metrics
-* Update convergence tracking
-* Stop sampling only when justified
+* Stores `(μ0, σ0², N)`
+* Immutable once created
+* Rejects non-converged baselines
+* Serializable and reusable
 
-**Key characteristics:**
+#### False Positive Analysis
 
-* Backend-agnostic (Vivado / Icarus)
-* Batch-based sampling
-* Deterministic stopping logic
-* Explicit handling of non-convergence
-
-This module produces **baseline statistical models**, not detection results.
+* Evaluates clean observations against clean baselines
+* Estimates false alarm rate
+* Provides empirical justification for thresholds
 
 ---
 
-## Design Principles Enforced
+### `inference/`
 
-The analysis layer is built around the following non-negotiable principles:
+**Purpose:** Quantify deviation from the baseline.
 
-* **Separation of concerns**
-  Measurement, sampling, and inference are never mixed.
+Given an observed value `Xobs`, deviation is measured using a Z-score:
 
-* **Statistical transparency**
-  Mean and variance are derived from data, never assumed.
+```
+Z = (Xobs − μ0) / sqrt(σ0²)
+```
 
-* **Reproducibility**
-  All randomness is controlled via configuration.
+A two-sided confidence value is derived from `|Z|`.
 
-* **No hidden heuristics**
-  Convergence and sampling behavior are explicit and inspectable.
+This stage produces **statistical evidence**, not decisions.
+
+---
+
+### `detector.py`
+
+**Purpose:** Combine evidence with policy.
+
+Detection uses externally defined thresholds:
+
+```
+decision =
+(|Z| > Z_threshold) AND (confidence > confidence_threshold)
+```
+
+* Thresholds are provided via configuration
+* No hard-coded tuning
+* Output includes full evidence, not just a boolean
 
 ---
 
 ## What This Layer Produces
 
-The output of the analysis layer consists of:
+The analysis layer produces:
 
-* baseline mean and variance estimates
+* baseline statistical models
 * convergence diagnostics
-* sampling metadata (number of samples, backend used)
+* deviation metrics
+* confidence values
+* false positive estimates
 
-These outputs serve as **inputs** to higher-level inference and experimental evaluation.
+These outputs are **inputs** to higher-level experiments and evaluation.
+
+---
+
+## What This Layer Does NOT Do
+
+Explicitly excluded responsibilities:
+
+* RTL inspection
+* Trojan trigger detection
+* functional verification
+* machine learning classification
+* threshold tuning based on results
+
+This separation prevents bias and preserves reproducibility.
 
 ---
 
-## What This Layer Does *Not* Do
-
-To avoid methodological errors, this layer explicitly avoids:
-
-* making binary “Trojan / no Trojan” decisions
-* applying detection thresholds
-* tuning parameters based on outcomes
-* incorporating design-specific knowledge
-
-Those responsibilities belong to **separate layers**.
-
----
