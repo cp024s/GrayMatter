@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from analysis.reporting.text_report import TextReportGenerator
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
@@ -66,7 +67,15 @@ def generate_mock_results():
 if __name__ == "__main__":
     results = generate_mock_results()
 
-    report = UnifiedImageReport(Path("results/plots"))
-    output_path = report.generate(results)
+plots_dir = Path("results/plots")
+summaries_dir = Path("results/summaries")
 
-    print(f"[OK] Report generated at: {output_path}")
+image_report = UnifiedImageReport(plots_dir)
+image_path = image_report.generate(results)
+
+text_report = TextReportGenerator(summaries_dir)
+text_path = text_report.generate(results)
+
+print("[OK] Reports generated:")
+print(f" - Image report : {image_path}")
+print(f" - Text report  : {text_path}")
