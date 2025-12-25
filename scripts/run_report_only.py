@@ -28,6 +28,8 @@ def generate_mock_results():
     results = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 
+        "total_signals": 3,   # <-- ADD THIS LINE
+        
         "statistics": {
             "mean": np.mean(baseline_samples),
             "std": np.std(baseline_samples),
