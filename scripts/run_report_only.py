@@ -28,7 +28,7 @@ def generate_mock_results():
     results = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 
-        "total_signals": 3,   # <-- ADD THIS LINE
+        "total_signals": len(results["anomalies"]),
 
         "statistics": {
             "mean": float(np.mean(baseline_samples)),
@@ -53,10 +53,26 @@ def generate_mock_results():
         },
 
         "anomalies": [
-            {"signal": "trigger_counter", "z_score": 4.8},
-            {"signal": "trojan_active", "z_score": 3.6},
-            {"signal": "payload_mask", "z_score": 3.1},
-        ],
+        {
+            "rank": 1,
+            "signal": "trigger_counter",
+            "deviation": 45900.0,
+            "z_score": 4.8,
+        },
+        {
+            "rank": 2,
+            "signal": "trojan_active",
+            "deviation": 13700.0,
+            "z_score": 3.6,
+        },
+        {
+            "rank": 3,
+            "signal": "payload_mask",
+            "deviation": 10300.0,
+            "z_score": 3.1,
+        },
+    ],
+
 
         "thresholds": {
             "z_threshold": 3.0
