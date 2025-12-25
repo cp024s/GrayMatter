@@ -22,6 +22,7 @@ class UnifiedImageReport:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def generate(self, results: dict) -> Path:
+        self._results = results   # <-- ADD THIS LINE
         """
         Generate the unified analysis report image.
 
