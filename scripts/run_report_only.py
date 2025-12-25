@@ -29,11 +29,18 @@ def generate_mock_results():
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 
         "total_signals": 3,   # <-- ADD THIS LINE
-        
+
         "statistics": {
-            "mean": np.mean(baseline_samples),
-            "std": np.std(baseline_samples),
+            "mean": float(np.mean(baseline_samples)),
+            "median": float(np.median(baseline_samples)),
+            "std": float(np.std(baseline_samples)),
+            "max": float(np.max(baseline_samples)),
+            "iqr_threshold": float(
+                np.percentile(baseline_samples, 75) +
+                1.5 * (np.percentile(baseline_samples, 75) - np.percentile(baseline_samples, 25))
+            ),
         },
+
 
         "samples": len(baseline_samples),
 
