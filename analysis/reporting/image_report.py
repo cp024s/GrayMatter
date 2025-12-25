@@ -228,15 +228,17 @@ class UnifiedImageReport:
         signals = [a["signal"] for a in anomalies]
         z_scores = [a["z_score"] for a in anomalies]
 
-        ax.bar(signals, z_scores, color="firebrick")
+        x = range(len(signals))
+        ax.bar(x, z_scores, color="firebrick")
         ax.axhline(z_thr, color="black", linestyle="--", label="Z Threshold")
 
         ax.set_title("Z-score per Signal")
         ax.set_ylabel("Z-score")
-        ax.set_xticklabels(signals, rotation=30, ha="right")
+        ax.set_xticks(x)
+        ax.set_xticklabels(signals, rotation=25, ha="right")
+
         ax.margins(x=0.15)
         ax.legend()
-
     # ------------------------------------------------------------------
     # Override reservation to populate plots
     # ------------------------------------------------------------------
