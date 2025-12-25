@@ -108,3 +108,16 @@ clean:
 	rm -rf $(RES_DIR)/plots/*
 	rm -rf $(RES_DIR)/summaries/*
 	rm -rf $(SIM_DIR)/logs/*
+
+# --------------------------------------------------
+# Python cache cleanup
+# --------------------------------------------------
+
+.PHONY: clean_pycache
+
+clean_pycache:
+	@echo "[CLEAN] Removing Python cache files..."
+	@find . -type d -name "__pycache__" -exec rm -rf {} + || true
+	@find . -type f -name "*.pyc" -delete || true
+	@find . -type f -name "*.pyo" -delete || true
+	@echo "[OK] Python cache cleaned."
