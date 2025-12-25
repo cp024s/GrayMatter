@@ -121,3 +121,14 @@ clean_pycache:
 	@find . -type f -name "*.pyc" -delete || true
 	@find . -type f -name "*.pyo" -delete || true
 	@echo "[OK] Python cache cleaned."
+
+# --------------------------------------------------
+# Standalone report generation (mock data)
+# --------------------------------------------------
+
+.PHONY: run_report_only
+
+run_report_only:
+	@echo "[RUN] Generating unified analysis report (standalone)..."
+	@python -m scripts.run_report_only
+	@echo "[OK] Report generated in results/plots/"
