@@ -48,9 +48,9 @@ class UnifiedImageReport:
         gs = GridSpec(
             nrows=5,
             ncols=2,
-            height_ratios=[0.8, 1.2, 2.5, 2.5, 1.2],
-            hspace=0.4,
-            wspace=0.25,
+            height_ratios=[0.9, 1.6, 2.4, 2.4, 1.6],
+            hspace=0.55,
+            wspace=0.30,
         )
 
         self._draw_header(fig, gs[0, :], results)
@@ -60,6 +60,7 @@ class UnifiedImageReport:
         self._reserve_axes(fig, gs)
 
         output_path = self.output_dir / "hardware_trojan_analysis_report.png"
+        plt.subplots_adjust(top=0.96, bottom=0.05)
         plt.savefig(output_path, bbox_inches="tight")
         plt.close(fig)
 
@@ -129,7 +130,7 @@ class UnifiedImageReport:
             cellLoc="center",
         )
 
-        table.scale(1, 1.6)
+        table.scale(1, 1.9)
 
         for (row, col), cell in table.get_celld().items():
             cell.set_edgecolor("black")
@@ -139,6 +140,7 @@ class UnifiedImageReport:
             else:
                 cell.set_facecolor("white")
 
+        ax.set_anchor("N")
         ax.set_title(
             "Statistical Summary",
             fontsize=14,
@@ -232,6 +234,7 @@ class UnifiedImageReport:
         ax.set_title("Z-score per Signal")
         ax.set_ylabel("Z-score")
         ax.set_xticklabels(signals, rotation=30, ha="right")
+        ax.margins(x=0.15)
         ax.legend()
 
     # ------------------------------------------------------------------
@@ -274,7 +277,7 @@ class UnifiedImageReport:
         ax.text(
             0.5, 0.75,
             banner_text,
-            fontsize=18,
+            fontsize=20,
             fontweight="bold",
             ha="center",
             va="center",
@@ -306,7 +309,7 @@ class UnifiedImageReport:
         ax.text(
             0.5, 0.15,
             details,
-            fontsize=10,
+            fontsize=11,
             ha="center",
             va="center",
         )
