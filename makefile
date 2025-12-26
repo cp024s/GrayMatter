@@ -108,6 +108,7 @@ clean:
 	rm -rf $(RES_DIR)/plots/*
 	rm -rf $(RES_DIR)/summaries/*
 	rm -rf $(SIM_DIR)/logs/*
+	rm -rf simv
 
 # --------------------------------------------------
 # Python cache cleanup

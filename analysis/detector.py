@@ -13,141 +13,96 @@ This module does NOT:
 - compute metrics
 - estimate baselines
 """
+"""
+Statistical detector for hardware Trojan identification
+using side-channel switching activity.
+"""
 
-import argparse
-from pathlib import Path
-from typing import Dict, Any
-
-import yaml
-
-from analysis.statistics.baseline_model import BaselineModel
-from analysis.inference.hypothesis import evaluate_hypothesis
+import numpy as np
 
 
-# ------------------------------------------------------------
-# Utility functions
-# ------------------------------------------------------------
-
-def load_yaml(path: Path) -> Dict[str, Any]:
-    """Load a YAML configuration file."""
-    if not path.exists():
-        raise FileNotFoundError(f"Configuration file not found: {path}")
-
-    with path.open("r") as f:
-        return yaml.safe_load(f)
-
-
-# ------------------------------------------------------------
-# Detection logic
-# ------------------------------------------------------------
-
-def detect(
-    observed: float,
-    baseline: BaselineModel,
-    thresholds: Dict[str, Any]
-) -> Dict[str, Any]:
+def run_detector(baseline: dict, observed: dict) -> dict:
     """
-    Perform detection based on observed value and thresholds.
+    Compare observed toggle activity against a clean baseline.
 
-    Parameters
-    ----------
-    observed : float
-        Observed scalar metric X_obs.
+    Args:
+        baseline (dict):
+            Output of build_baseline_distribution()
+        observed (dict):
+            { "signal_name": toggle_count }
 
-    baseline : BaselineModel
-        Converged baseline statistical model.
-
-    thresholds : dict
-        Detection threshold configuration.
-
-    Returns
-    -------
-    dict
-        Structured detection result including evidence
-        and decision flags.
+    Returns:
+        dict: results compatible with reporting layer
     """
 
-    stats = evaluate_hypothesis(observed, baseline)
+    baseline_mean = baseline["mean"]
+    baseline_std = baseline["std"]
+    iqr_threshold = baseline["iqr_threshold"]
 
-    z_threshold = thresholds.get("z_score_threshold")
-    confidence_level = thresholds.get("confidence_level")
+    anomalies = []
 
-    if z_threshold is None or confidence_level is None:
-        raise ValueError(
-            "Detection thresholds must define "
-            "'z_score_threshold' and 'confidence_level'"
+    # --------------------------------------------------
+    # Analyze observed signals
+    # --------------------------------------------------
+    for sig, val in observed.items():
+        deviation_pct = (
+            ((val - baseline_mean) / baseline_mean) * 100.0
+            if baseline_mean > 0 else 0.0
         )
 
-    z_exceeded = abs(stats["z_score"]) > z_threshold
-    confidence_exceeded = stats["confidence"] > confidence_level
+        z_score = (
+            (val - baseline_mean) / baseline_std
+            if baseline_std > 0 else 0.0
+        )
 
-    decision = z_exceeded and confidence_exceeded
+        # IQR-based anomaly decision
+        if val > iqr_threshold:
+            anomalies.append({
+                "signal": sig,
+                "deviation": round(deviation_pct, 2),
+                "z_score": round(z_score, 2),
+            })
 
-    return {
-        "observed": stats["observed"],
-        "baseline_mean": stats["mean"],
-        "baseline_variance": stats["variance"],
-        "z_score": stats["z_score"],
-        "confidence": stats["confidence"],
-        "z_threshold": z_threshold,
-        "confidence_level": confidence_level,
-        "z_exceeded": z_exceeded,
-        "confidence_exceeded": confidence_exceeded,
-        "decision": decision,
+    # --------------------------------------------------
+    # Rank anomalies
+    # --------------------------------------------------
+    anomalies.sort(key=lambda x: abs(x["deviation"]), reverse=True)
+    for idx, a in enumerate(anomalies, start=1):
+        a["rank"] = idx
+
+    # --------------------------------------------------
+    # Final decision
+    # --------------------------------------------------
+    trojan_detected = len(anomalies) > 0
+
+    results = {
+        "total_signals": len(observed),
+
+        "statistics": {
+            "mean": round(baseline_mean, 3),
+            "median": round(float(np.median(baseline["samples"])), 3),
+            "std": round(baseline_std, 3),
+            "max": round(float(np.max(baseline["samples"])), 3),
+            "iqr_threshold": round(iqr_threshold, 3),
+        },
+
+        "baseline_samples": baseline["samples"],
+        "observed_samples": list(observed.values()),
+
+        "anomalies": anomalies,
+
+        "thresholds": {
+            "z_threshold": 2.5,
+        },
+
+        "decision": {
+            "trojan_detected": trojan_detected,
+            "primary_signal": anomalies[0]["signal"] if anomalies else None,
+            "primary_deviation": anomalies[0]["deviation"] if anomalies else None,
+            "threshold": "IQR-based",
+            "z_score": anomalies[0]["z_score"] if anomalies else None,
+            "confidence": "high" if trojan_detected else "low",
+        },
     }
 
-
-# ------------------------------------------------------------
-# CLI entry point
-# ------------------------------------------------------------
-
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Detection orchestration"
-    )
-
-    parser.add_argument(
-        "--baseline",
-        required=True,
-        type=Path,
-        help="Path to baseline model YAML"
-    )
-
-    parser.add_argument(
-        "--observed",
-        required=True,
-        type=float,
-        help="Observed scalar metric X_obs"
-    )
-
-    parser.add_argument(
-        "--det_cfg",
-        required=True,
-        type=Path,
-        help="Path to detection thresholds YAML"
-    )
-
-    return parser.parse_args()
-
-
-def main() -> None:
-    """CLI entry point."""
-    args = parse_args()
-
-    baseline = BaselineModel.load(args.baseline)
-    thresholds = load_yaml(args.det_cfg)
-
-    result = detect(
-        observed=args.observed,
-        baseline=baseline,
-        thresholds=thresholds
-    )
-
-    # Print structured result for inspection
-    for k, v in result.items():
-        print(f"{k}: {v}")
-
-
-if __name__ == "__main__":
-    main()
+    return results
