@@ -11,162 +11,63 @@ This module must NOT:
 - update statistics
 - apply detection thresholds
 """
+"""
+Baseline statistical model construction for clean designs.
+"""
 
-from typing import Dict, Any
-from pathlib import Path
-import yaml
+import numpy as np
 
 
-class BaselineModel:
+def build_baseline_distribution(clean_toggles: dict) -> dict:
     """
-    Represents a converged baseline distribution.
+    Build a baseline distribution from clean-design toggle counts.
 
-    The baseline is treated as immutable once constructed.
+    Args:
+        clean_toggles (dict):
+            { "signal_name": toggle_count }
+
+    Returns:
+        dict containing baseline statistics and samples
     """
 
-    def __init__(
-        self,
-        mean: float,
-        variance: float,
-        samples: int,
-        converged: bool,
-        metadata: Dict[str, Any]
-    ) -> None:
-        """
-        Initialize a baseline model.
+    if not clean_toggles:
+        raise ValueError("Empty toggle dictionary provided to baseline model")
 
-        Parameters
-        ----------
-        mean : float
-            Baseline mean (μ).
+    # --------------------------------------------------
+    # Raw samples (toggle counts per signal)
+    # --------------------------------------------------
+    samples = np.array(list(clean_toggles.values()), dtype=float)
 
-        variance : float
-            Baseline variance (σ²).
+    # --------------------------------------------------
+    # Basic statistics
+    # --------------------------------------------------
+    mean = float(np.mean(samples))
+    std = float(np.std(samples))
+    variance = float(np.var(samples))
 
-        samples : int
-            Number of samples used to estimate the baseline.
+    # --------------------------------------------------
+    # Robust statistics (IQR-based)
+    # --------------------------------------------------
+    q1 = np.percentile(samples, 25)
+    q3 = np.percentile(samples, 75)
+    iqr = q3 - q1
+    iqr_threshold = q3 + 1.5 * iqr
 
-        converged : bool
-            Whether Monte Carlo convergence was reached.
+    # --------------------------------------------------
+    # Per-signal normalization (z-score)
+    # --------------------------------------------------
+    normalized = {}
+    for sig, val in clean_toggles.items():
+        if std > 0:
+            normalized[sig] = (val - mean) / std
+        else:
+            normalized[sig] = 0.0
 
-        metadata : dict
-            Additional contextual information (backend, config).
-        """
-
-        self._validate(mean, variance, samples, converged)
-
-        self.mean = mean
-        self.variance = variance
-        self.samples = samples
-        self.converged = converged
-        self.metadata = metadata
-
-    @staticmethod
-    def _validate(
-        mean: float,
-        variance: float,
-        samples: int,
-        converged: bool
-    ) -> None:
-        """Validate baseline parameters."""
-        if samples <= 1:
-            raise ValueError(
-                "Baseline must be estimated from more than one sample"
-            )
-
-        if variance < 0:
-            raise ValueError("Variance must be non-negative")
-
-        if not converged:
-            raise ValueError(
-                "Baseline model cannot be created without convergence"
-            )
-
-    def as_dict(self) -> Dict[str, Any]:
-        """
-        Convert baseline model to a dictionary.
-
-        Returns
-        -------
-        dict
-            Dictionary representation of the baseline.
-        """
-        return {
-            "mean": self.mean,
-            "variance": self.variance,
-            "samples": self.samples,
-            "converged": self.converged,
-            "metadata": self.metadata,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BaselineModel":
-        """
-        Construct a BaselineModel from a dictionary.
-
-        Parameters
-        ----------
-        data : dict
-            Dictionary containing baseline fields.
-
-        Returns
-        -------
-        BaselineModel
-            Instantiated baseline model.
-        """
-
-        required_fields = [
-            "mean",
-            "variance",
-            "samples",
-            "converged",
-            "metadata",
-        ]
-
-        for field in required_fields:
-            if field not in data:
-                raise ValueError(f"Missing required field: {field}")
-
-        return cls(
-            mean=data["mean"],
-            variance=data["variance"],
-            samples=data["samples"],
-            converged=data["converged"],
-            metadata=data["metadata"],
-        )
-
-    def save(self, path: Path) -> None:
-        """
-        Serialize the baseline model to a YAML file.
-
-        Parameters
-        ----------
-        path : Path
-            Output path for the baseline YAML file.
-        """
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w") as f:
-            yaml.safe_dump(self.as_dict(), f)
-
-    @classmethod
-    def load(cls, path: Path) -> "BaselineModel":
-        """
-        Load a baseline model from a YAML file.
-
-        Parameters
-        ----------
-        path : Path
-            Path to baseline YAML file.
-
-        Returns
-        -------
-        BaselineModel
-            Loaded baseline model.
-        """
-        if not path.exists():
-            raise FileNotFoundError(f"Baseline file not found: {path}")
-
-        with path.open("r") as f:
-            data = yaml.safe_load(f)
-
-        return cls.from_dict(data)
+    return {
+        "samples": samples.tolist(),
+        "mean": mean,
+        "std": std,
+        "variance": variance,
+        "iqr_threshold": float(iqr_threshold),
+        "normalized": normalized,
+    }
