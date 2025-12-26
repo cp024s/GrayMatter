@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 from datetime import datetime
+import numpy as np
 
 # --------------------------------------------------
 # Ensure project root is on PYTHONPATH
@@ -33,20 +34,14 @@ def run_analysis(vcd_path: Path):
     # --------------------------------------------------
     toggle_data = extract_toggle_counts(vcd_path)
 
-    # Expecting structure like:
-    # {
-    #   "u_clean.signal": count,
-    #   "u_trojan.signal": count,
-    # }
-
     clean_toggles = {
         sig: cnt for sig, cnt in toggle_data.items()
-        if sig.startswith("u_clean.")
+        if ".u_clean." in sig
     }
 
     trojan_toggles = {
         sig: cnt for sig, cnt in toggle_data.items()
-        if sig.startswith("u_trojan.")
+        if ".u_trojan." in sig
     }
 
     if not clean_toggles or not trojan_toggles:
@@ -58,7 +53,25 @@ def run_analysis(vcd_path: Path):
     baseline = build_baseline_distribution(clean_toggles)
 
     # --------------------------------------------------
-    # Step 3: Run detector (clean vs trojan)
+    # Step 3: Compute baseline convergence
+    # --------------------------------------------------
+    baseline_samples = baseline["samples"]
+
+    means = []
+    variances = []
+
+    for i in range(5, len(baseline_samples) + 1):
+        subset = baseline_samples[:i]
+        means.append(float(np.mean(subset)))
+        variances.append(float(np.var(subset)))
+
+    convergence = {
+        "means": means,
+        "variances": variances,
+    }
+
+    # --------------------------------------------------
+    # Step 4: Run detector
     # --------------------------------------------------
     results = run_detector(
         baseline=baseline,
@@ -66,8 +79,9 @@ def run_analysis(vcd_path: Path):
     )
 
     # --------------------------------------------------
-    # Step 4: Attach metadata
+    # Step 5: Attach convergence + metadata
     # --------------------------------------------------
+    results["convergence"] = convergence
     results["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     results["samples"] = len(clean_toggles)
 
