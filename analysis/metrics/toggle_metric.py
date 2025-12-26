@@ -1,117 +1,97 @@
 """
-Toggle-based switching activity metric.
-
-This module defines a pure metric function that converts
-parsed switching activity data into a single scalar value X.
-
-The metric is intentionally simple and transparent:
-    X = total_number_of_toggles / normalization_factor
-
-This file must NOT:
-- perform statistical inference
-- apply thresholds
-- depend on Monte Carlo logic
+Toggle-based side-channel metric extraction from VCD files.
 """
 
-from typing import Dict, Any
+from pathlib import Path
+from collections import defaultdict
 
 
-def compute_toggle_metric(
-    activity_data: Dict[str, Any],
-    normalization: str = "per_cycle"
-) -> float:
+def extract_toggle_counts(vcd_path: Path) -> dict:
     """
-    Compute a toggle-based switching activity metric.
+    Parse a VCD file and count value toggles per signal.
 
-    Parameters
-    ----------
-    activity_data : dict
-        Parsed switching activity data for a single simulation run.
-        Expected structure (minimum):
-            {
-                "total_toggles": int,
-                "cycles": int
-            }
-
-    normalization : str
-        Normalization mode.
-        Supported values:
-            - "per_cycle" : normalize by number of cycles
-            - "raw"       : no normalization
-
-    Returns
-    -------
-    float
-        Scalar switching activity metric X.
-
-    Raises
-    ------
-    ValueError
-        If required fields are missing or normalization is invalid.
+    Returns:
+        dict: { "hierarchical.signal.name": toggle_count }
     """
 
-    if not isinstance(activity_data, dict):
-        raise ValueError("activity_data must be a dictionary")
+    if not vcd_path.exists():
+        raise FileNotFoundError(f"VCD file not found: {vcd_path}")
 
-    if "total_toggles" not in activity_data:
-        raise ValueError("activity_data missing required key: 'total_toggles'")
+    # --------------------------------------------------
+    # VCD symbol → signal name mapping
+    # --------------------------------------------------
+    symbol_to_signal = {}
 
-    if normalization == "per_cycle":
-        if "cycles" not in activity_data:
-            raise ValueError(
-                "activity_data missing required key 'cycles' "
-                "for per_cycle normalization"
-            )
+    # --------------------------------------------------
+    # Last seen value per symbol
+    # --------------------------------------------------
+    last_value = {}
 
-        cycles = activity_data["cycles"]
-        if cycles <= 0:
-            raise ValueError("Number of cycles must be positive")
+    # --------------------------------------------------
+    # Toggle counters per signal
+    # --------------------------------------------------
+    toggle_counts = defaultdict(int)
 
-        metric = activity_data["total_toggles"] / float(cycles)
+    in_header = True
 
-    elif normalization == "raw":
-        metric = float(activity_data["total_toggles"])
+    with open(vcd_path, "r") as f:
+        for line in f:
+            line = line.strip()
 
-    else:
-        raise ValueError(
-            f"Unsupported normalization mode: {normalization}"
-        )
+            # ------------------------------------------
+            # Header parsing
+            # ------------------------------------------
+            if in_header:
+                if line.startswith("$var"):
+                    # Example:
+                    # $var wire 1 ! u_clean.noise_reg_a $end
+                    parts = line.split()
+                    symbol = parts[3]
+                    signal_name = parts[4]
 
-    return metric
+                    symbol_to_signal[symbol] = signal_name
+                    last_value[symbol] = None
 
+                elif line == "$enddefinitions $end":
+                    in_header = False
 
-def validate_activity_data(activity_data: Dict[str, Any]) -> None:
-    """
-    Validate basic structure of parsed activity data.
+                continue
 
-    This function performs lightweight sanity checks and
-    raises exceptions on structural errors.
+            # ------------------------------------------
+            # Ignore timestamps
+            # ------------------------------------------
+            if line.startswith("#"):
+                continue
 
-    Parameters
-    ----------
-    activity_data : dict
-        Parsed switching activity data.
+            # ------------------------------------------
+            # Scalar value change: 0!, 1!
+            # ------------------------------------------
+            if line and line[0] in ("0", "1"):
+                value = line[0]
+                symbol = line[1:]
 
-    Raises
-    ------
-    ValueError
-        If validation fails.
-    """
+            # ------------------------------------------
+            # Vector value change: b1010 !
+            # ------------------------------------------
+            elif line.startswith("b"):
+                try:
+                    value, symbol = line[1:].split()
+                except ValueError:
+                    continue
 
-    required_fields = ["total_toggles", "cycles"]
+            else:
+                continue
 
-    for field in required_fields:
-        if field not in activity_data:
-            raise ValueError(f"Missing required field: {field}")
+            # ------------------------------------------
+            # Toggle detection
+            # ------------------------------------------
+            prev = last_value.get(symbol)
 
-    if not isinstance(activity_data["total_toggles"], int):
-        raise ValueError("'total_toggles' must be an integer")
+            if prev is not None and prev != value:
+                signal = symbol_to_signal.get(symbol)
+                if signal:
+                    toggle_counts[signal] += 1
 
-    if not isinstance(activity_data["cycles"], int):
-        raise ValueError("'cycles' must be an integer")
+            last_value[symbol] = value
 
-    if activity_data["total_toggles"] < 0:
-        raise ValueError("'total_toggles' must be non-negative")
-
-    if activity_data["cycles"] <= 0:
-        raise ValueError("'cycles' must be positive")
+    return dict(toggle_counts)
