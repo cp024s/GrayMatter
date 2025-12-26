@@ -1,5 +1,6 @@
 """
-Toggle-based side-channel metric extraction from VCD files.
+Toggle-based side-channel metric extraction from VCD files
+with full hierarchical scope support.
 """
 
 from pathlib import Path
@@ -17,39 +18,39 @@ def extract_toggle_counts(vcd_path: Path) -> dict:
     if not vcd_path.exists():
         raise FileNotFoundError(f"VCD file not found: {vcd_path}")
 
-    # --------------------------------------------------
-    # VCD symbol → signal name mapping
-    # --------------------------------------------------
     symbol_to_signal = {}
-
-    # --------------------------------------------------
-    # Last seen value per symbol
-    # --------------------------------------------------
     last_value = {}
-
-    # --------------------------------------------------
-    # Toggle counters per signal
-    # --------------------------------------------------
     toggle_counts = defaultdict(int)
 
+    scope_stack = []
     in_header = True
 
     with open(vcd_path, "r") as f:
         for line in f:
             line = line.strip()
 
-            # ------------------------------------------
-            # Header parsing
-            # ------------------------------------------
+            # -------------------------------
+            # Header parsing (scope aware)
+            # -------------------------------
             if in_header:
-                if line.startswith("$var"):
-                    # Example:
-                    # $var wire 1 ! u_clean.noise_reg_a $end
+
+                if line.startswith("$scope"):
+                    # Example: $scope module u_clean $end
+                    parts = line.split()
+                    scope_stack.append(parts[2])
+
+                elif line.startswith("$upscope"):
+                    if scope_stack:
+                        scope_stack.pop()
+
+                elif line.startswith("$var"):
+                    # Example: $var wire 1 ! noise_reg_a $end
                     parts = line.split()
                     symbol = parts[3]
-                    signal_name = parts[4]
+                    leaf_name = parts[4]
 
-                    symbol_to_signal[symbol] = signal_name
+                    full_name = ".".join(scope_stack + [leaf_name])
+                    symbol_to_signal[symbol] = full_name
                     last_value[symbol] = None
 
                 elif line == "$enddefinitions $end":
@@ -57,34 +58,30 @@ def extract_toggle_counts(vcd_path: Path) -> dict:
 
                 continue
 
-            # ------------------------------------------
+            # -------------------------------
             # Ignore timestamps
-            # ------------------------------------------
+            # -------------------------------
             if line.startswith("#"):
                 continue
 
-            # ------------------------------------------
-            # Scalar value change: 0!, 1!
-            # ------------------------------------------
+            # -------------------------------
+            # Scalar value change
+            # -------------------------------
             if line and line[0] in ("0", "1"):
                 value = line[0]
                 symbol = line[1:]
 
-            # ------------------------------------------
-            # Vector value change: b1010 !
-            # ------------------------------------------
+            # -------------------------------
+            # Vector value change
+            # -------------------------------
             elif line.startswith("b"):
                 try:
                     value, symbol = line[1:].split()
                 except ValueError:
                     continue
-
             else:
                 continue
 
-            # ------------------------------------------
-            # Toggle detection
-            # ------------------------------------------
             prev = last_value.get(symbol)
 
             if prev is not None and prev != value:
