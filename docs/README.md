@@ -1,5 +1,6 @@
 
-# Hardware Trojan Detection using Side-Channel Switching Activity
+# <div align="center">Hardware Trojan Detection using Side-Channel Switching Activity</div>
+---
 
 This project implements a **pre-silicon hardware Trojan detection framework** based on **per-signal switching activity analysis** extracted from RTL simulation waveforms.
 
