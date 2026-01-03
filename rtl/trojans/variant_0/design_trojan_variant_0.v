@@ -1,4 +1,4 @@
-module alu_trojan_variant0 (
+module alu_trojan_variant_0 (
     input  wire        clk,
     input  wire        rst_n,
     input  wire [3:0]  A,
@@ -10,8 +10,22 @@ module alu_trojan_variant0 (
     output reg         overflow
 );
 
-    // IDENTICAL to clean design (no trojan logic)
-    alu_clean_secure u_clean_clone (
+    // -------------------------------------------------
+    // Loud always-on Trojan payload (positive control)
+    // -------------------------------------------------
+    reg [15:0] trojan_counter;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            trojan_counter <= 16'd0;
+        else
+            trojan_counter <= trojan_counter + 1'b1;
+    end
+
+    // -------------------------------------------------
+    // Clean ALU logic (unchanged)
+    // -------------------------------------------------
+    alu_clean_secure u_clean (
         .clk(clk),
         .rst_n(rst_n),
         .A(A),

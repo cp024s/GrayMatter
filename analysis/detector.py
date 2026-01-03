@@ -1,21 +1,10 @@
 """
-Detection orchestration logic.
-
-This module combines:
-- a converged baseline model
-- an observed scalar metric
-- a decision policy (thresholds)
-
-to produce a structured detection result.
-
-This module does NOT:
-- perform simulation
-- compute metrics
-- estimate baselines
-"""
-"""
 Statistical detector for hardware Trojan identification
-using side-channel switching activity.
+using per-signal side-channel switching activity.
+
+This implementation is:
+- Per-signal (Option A)
+- Backward-compatible with reporting layer
 """
 
 import numpy as np
@@ -23,85 +12,97 @@ import numpy as np
 
 def run_detector(baseline: dict, observed: dict) -> dict:
     """
-    Compare observed toggle activity against a clean baseline.
-
-    Args:
-        baseline (dict):
-            Output of build_baseline_distribution()
-        observed (dict):
-            { "signal_name": toggle_count }
-
-    Returns:
-        dict: results compatible with reporting layer
+    Per-signal anomaly detection using individual baselines.
     """
 
-    baseline_mean = baseline["mean"]
-    baseline_std = baseline["std"]
-    iqr_threshold = baseline["iqr_threshold"]
-
     anomalies = []
+    deviations = []
+
+    baseline_samples = []
+    observed_samples = []
 
     # --------------------------------------------------
-    # Analyze observed signals
+    # Per-signal analysis
     # --------------------------------------------------
-    for sig, val in observed.items():
-        deviation_pct = (
-            ((val - baseline_mean) / baseline_mean) * 100.0
-            if baseline_mean > 0 else 0.0
-        )
+    for signal, obs_val in observed.items():
+        observed_samples.append(obs_val)
 
-        z_score = (
-            (val - baseline_mean) / baseline_std
-            if baseline_std > 0 else 0.0
-        )
+        if signal not in baseline:
+            continue
 
-        # IQR-based anomaly decision
-        if val > iqr_threshold:
+        b = baseline[signal]
+        mean = b.get("mean", 0.0)
+        std = b.get("std", 0.0)
+        threshold = b.get("iqr_threshold", float("inf"))
+
+        baseline_samples.extend(b.get("samples", []))
+
+        # Deviation %
+        if mean > 0:
+            deviation_pct = ((obs_val - mean) / mean) * 100.0
+        else:
+            deviation_pct = 0.0
+
+        deviations.append(abs(deviation_pct))
+
+        z_score = ((obs_val - mean) / std) if std > 0 else 0.0
+
+        if obs_val > threshold:
             anomalies.append({
-                "signal": sig,
+                "signal": signal,
+                "observed": int(obs_val),
+                "mean": round(mean, 3),
                 "deviation": round(deviation_pct, 2),
                 "z_score": round(z_score, 2),
             })
 
-    # --------------------------------------------------
     # Rank anomalies
-    # --------------------------------------------------
     anomalies.sort(key=lambda x: abs(x["deviation"]), reverse=True)
     for idx, a in enumerate(anomalies, start=1):
         a["rank"] = idx
 
     # --------------------------------------------------
-    # Final decision
+    # Aggregate stats (safe for empty cases)
     # --------------------------------------------------
-    trojan_detected = len(anomalies) > 0
+    if deviations:
+        stats_mean = float(np.mean(deviations))
+        stats_median = float(np.median(deviations))
+        stats_std = float(np.std(deviations))
+        stats_max = float(np.max(deviations))
+    else:
+        stats_mean = stats_median = stats_std = stats_max = 0.0
 
     results = {
+        # --------------------------------------------------
+        # Required by reporting
+        # --------------------------------------------------
         "total_signals": len(observed),
 
         "statistics": {
-            "mean": round(baseline_mean, 3),
-            "median": round(float(np.median(baseline["samples"])), 3),
-            "std": round(baseline_std, 3),
-            "max": round(float(np.max(baseline["samples"])), 3),
-            "iqr_threshold": round(iqr_threshold, 3),
+            "mean": round(stats_mean, 3),
+            "median": round(stats_median, 3),
+            "std": round(stats_std, 3),
+            "max": round(stats_max, 3),
+            "iqr_threshold": "per-signal",
         },
 
-        "baseline_samples": baseline["samples"],
-        "observed_samples": list(observed.values()),
+        # REQUIRED legacy fields (even if empty / symbolic)
+        "baseline_samples": baseline_samples,
+        "observed_samples": observed_samples,
 
         "anomalies": anomalies,
 
         "thresholds": {
-            "z_threshold": 2.5,
+            "z_threshold": "per-signal"
         },
 
         "decision": {
-            "trojan_detected": trojan_detected,
+            "trojan_detected": len(anomalies) > 0,
             "primary_signal": anomalies[0]["signal"] if anomalies else None,
             "primary_deviation": anomalies[0]["deviation"] if anomalies else None,
-            "threshold": "IQR-based",
+            "threshold": "per-signal IQR",
             "z_score": anomalies[0]["z_score"] if anomalies else None,
-            "confidence": "high" if trojan_detected else "low",
+            "confidence": "high" if anomalies else "low",
         },
     }
 

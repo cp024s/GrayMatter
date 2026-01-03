@@ -244,14 +244,17 @@ class UnifiedImageReport:
         ax = fig.add_subplot(grid_cell)
 
         anomalies = results["anomalies"]
-        z_thr = results["thresholds"]["z_threshold"]
+        z_thr = results.get("thresholds", {}).get("z_threshold", None)
 
         signals = [a["signal"] for a in anomalies]
         z_scores = [a["z_score"] for a in anomalies]
 
         x = range(len(signals))
         ax.bar(x, z_scores, color="firebrick")
-        ax.axhline(z_thr, color="black", linestyle="--", label="Z Threshold")
+        # ax.axhline(z_thr, color="black", linestyle="--", label="Z Threshold")
+        if z_thr is not None:
+            ax.axhline(z_thr, linestyle="--", color="red", label="Z-threshold")
+
 
         ax.set_title("Z-score per Signal")
         ax.set_ylabel("Z-score")

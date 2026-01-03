@@ -10,12 +10,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # -----------------------------------------------------------------------------
-# Fixed RTL paths
+# RTL paths
 # -----------------------------------------------------------------------------
 RTL_COMMON = ROOT / "rtl" / "common" / "alu_trojan_secure.v"
 RTL_CLEAN  = ROOT / "rtl" / "clean" / "alu_clean_secure.v"
 TB_FILE    = ROOT / "tb" / "tb_alu_secure.sv"
-RESULTS    = ROOT / "results"
+
+RESULTS = ROOT / "results"
 
 
 def build_iverilog_cmd(variant: str, out_dir: Path):
@@ -25,8 +26,7 @@ def build_iverilog_cmd(variant: str, out_dir: Path):
     # Macro control
     # ---------------------------------------------------------
     if variant != "clean":
-        cmd += ["-DINCLUDE_TROJAN"]
-        cmd += [f"-DTROJAN_{variant.upper()}"]
+        cmd += ["-DINCLUDE_TROJAN", f"-DTROJAN_{variant.upper()}"]
 
     # ---------------------------------------------------------
     # Output binary
@@ -35,7 +35,7 @@ def build_iverilog_cmd(variant: str, out_dir: Path):
     cmd += ["-o", str(sim_out)]
 
     # ---------------------------------------------------------
-    # RTL (ORDER MATTERS)
+    # RTL (order matters)
     # ---------------------------------------------------------
     cmd += [
         str(RTL_COMMON),
@@ -73,18 +73,18 @@ def run_simulation(variant: str):
     subprocess.run(cmd, check=True)
 
     print("[INFO] Running simulation...")
-    subprocess.run([str(sim_out)], check=True)
+    # IMPORTANT: run from out_dir so VCD lands here
+    subprocess.run([str(sim_out)], cwd=out_dir, check=True)
 
     print("[OK] Simulation completed")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Hardware Trojan experiment runner")
+    parser = argparse.ArgumentParser(description="Simulation runner")
     parser.add_argument(
         "--variant",
         required=True,
-        choices=["clean", "v1", "v2", "v3"],
-        help="Design variant to simulate",
+        choices=["clean", "v0", "v1", "v2", "v3"],
     )
     args = parser.parse_args()
 
