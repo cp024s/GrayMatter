@@ -61,11 +61,20 @@ def build_iverilog_cmd(variant: str, out_dir: Path):
     return cmd, sim_out
 
 
-def run_simulation(variant: str):
-    out_dir = RESULTS / variant
+def run_simulation(variant: str, seed: int | None):
+    # ---------------------------------------------------------
+    # Output directory logic
+    # ---------------------------------------------------------
+    if seed is None:
+        out_dir = RESULTS / variant
+    else:
+        out_dir = RESULTS / variant / f"seed_{seed}"
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[RUN] Variant : {variant}")
+    if seed is not None:
+        print(f"[RUN] Seed    : {seed}")
 
     cmd, sim_out = build_iverilog_cmd(variant, out_dir)
 
@@ -73,8 +82,15 @@ def run_simulation(variant: str):
     subprocess.run(cmd, check=True)
 
     print("[INFO] Running simulation...")
-    # IMPORTANT: run from out_dir so VCD lands here
-    subprocess.run([str(sim_out)], cwd=out_dir, check=True)
+    run_cmd = [str(sim_out)]
+
+    # ---------------------------------------------------------
+    # Pass seed as plusarg (future-proof)
+    # ---------------------------------------------------------
+    if seed is not None:
+        run_cmd.append(f"+SEED={seed}")
+
+    subprocess.run(run_cmd, cwd=out_dir, check=True)
 
     print("[OK] Simulation completed")
 
@@ -86,9 +102,15 @@ def main():
         required=True,
         choices=["clean", "v0", "v1", "v2", "v3"],
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Optional random seed (used for baseline runs)",
+    )
     args = parser.parse_args()
 
-    run_simulation(args.variant)
+    run_simulation(args.variant, args.seed)
 
 
 if __name__ == "__main__":
