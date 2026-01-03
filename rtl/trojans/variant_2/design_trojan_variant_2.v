@@ -1,4 +1,4 @@
-module alu_trojan_variant2 (
+module alu_trojan_variant_2 (
     input  wire        clk,
     input  wire        rst_n,
     input  wire [3:0]  A,
