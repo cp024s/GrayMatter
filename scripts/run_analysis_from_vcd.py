@@ -1,116 +1,97 @@
 #!/usr/bin/env python3
 
-import sys
-from pathlib import Path
-
-# ------------------------------------------------------------
-# FIX PYTHON PATH (THIS IS THE KEY LINE)
-# ------------------------------------------------------------
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
 import argparse
-import json
+from pathlib import Path
+from datetime import datetime
 
 from analysis.metrics.toggle_metric import extract_toggle_counts
+from analysis.statistics.baseline_model import build_baseline_distribution
 from analysis.detector import run_detector
-from analysis.reporting.image_report import UnifiedImageReport
 from analysis.reporting.text_report import TextReportGenerator
+from analysis.reporting.image_report import UnifiedImageReport
 
 
-RESULTS_DIR = ROOT / "results"
-BASELINE_FILE = RESULTS_DIR / "clean" / "baseline.json"
+ROOT = Path(__file__).resolve().parents[1]
+RESULTS = ROOT / "results"
 
 
-# ------------------------------------------------------------
-# Argument parsing
-# ------------------------------------------------------------
-def parse_args():
-    p = argparse.ArgumentParser(description="Run Trojan analysis from VCD")
-    p.add_argument("--variant", required=True,
-                   help="clean | v0 | v1 | v2")
-    p.add_argument("--vcd", required=True,
-                   help="Path to VCD file")
-    return p.parse_args()
+def collect_clean_baseline(clean_root: Path) -> list[dict]:
+    """
+    Collect toggle counts from all clean seed runs.
+    Expects:
+      results/clean/seed_*/alu_secure.vcd
+    """
+    runs = []
+
+    seed_dirs = sorted(p for p in clean_root.iterdir() if p.is_dir())
+    if not seed_dirs:
+        raise RuntimeError("No clean seed directories found.")
+
+    for d in seed_dirs:
+        vcd = d / "alu_secure.vcd"
+        if not vcd.exists():
+            continue
+        runs.append(extract_toggle_counts(vcd))
+
+    if not runs:
+        raise RuntimeError("No clean VCDs found for baseline.")
+
+    return runs
 
 
-# ------------------------------------------------------------
-# Main
-# ------------------------------------------------------------
 def main():
-    args = parse_args()
+    parser = argparse.ArgumentParser(description="Analyze VCD against baseline")
+    parser.add_argument("--variant", required=True)
+    parser.add_argument("--vcd", required=True)
+    args = parser.parse_args()
 
     variant = args.variant
     vcd_path = Path(args.vcd)
 
-    out_dir = RESULTS_DIR / variant
-    plots_dir = out_dir / "plots"
-    summaries_dir = out_dir / "summaries"
+    # --------------------------------------------------
+    # Load baseline (MULTI-RUN)
+    # --------------------------------------------------
+    clean_root = RESULTS / "clean"
+    baseline_runs = collect_clean_baseline(clean_root)
+    baseline = build_baseline_distribution(baseline_runs)
 
-    plots_dir.mkdir(parents=True, exist_ok=True)
-    summaries_dir.mkdir(parents=True, exist_ok=True)
+    # --------------------------------------------------
+    # Observed toggles
+    # --------------------------------------------------
+    observed = extract_toggle_counts(vcd_path)
 
-    # --------------------------------------------------------
-    # Extract toggles
-    # --------------------------------------------------------
-    toggles = extract_toggle_counts(vcd_path)
-    total_activity = sum(toggles.values())
+    total_toggles = sum(observed.values())
+    print(f"[DEBUG] Total toggles ({variant}): {total_toggles}")
 
-    print(f"[DEBUG] Total toggles ({variant}): {total_activity}")
+    # --------------------------------------------------
+    # Run detector
+    # --------------------------------------------------
+    results = run_detector(baseline, observed)
+    results["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # --------------------------------------------------------
-    # CLEAN: build baseline
-    # --------------------------------------------------------
-    if variant == "clean":
-        baseline = {}
+    # --------------------------------------------------
+    # Global positive control (keep this)
+    # --------------------------------------------------
+    clean_mean_total = sum(
+        sum(run.values()) for run in baseline_runs
+    ) / len(baseline_runs)
 
-        for sig, val in toggles.items():
-            baseline[sig] = {
-                "mean": float(val),
-                "std": 0.0,
-                "iqr_threshold": float(val),
-                "samples": [float(val)],
-            }
+    if total_toggles > 1.5 * clean_mean_total:
+        results["decision"]["trojan_detected"] = True
+        results["decision"]["threshold"] = "global activity (1.5× clean)"
+        results["decision"]["confidence"] = "high"
+        results["decision"]["primary_signal"] = None
+        results["decision"]["primary_deviation"] = None
 
-        baseline["__global_activity__"] = total_activity
+    # --------------------------------------------------
+    # Reports
+    # --------------------------------------------------
+    out_dir = RESULTS / variant
+    (out_dir / "summaries").mkdir(parents=True, exist_ok=True)
+    (out_dir / "plots").mkdir(parents=True, exist_ok=True)
 
-        BASELINE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with BASELINE_FILE.open("w") as f:
-            json.dump(baseline, f, indent=2)
-
-        results = run_detector(baseline, toggles)
-
-    # --------------------------------------------------------
-    # NON-CLEAN: load baseline
-    # --------------------------------------------------------
-    else:
-        if not BASELINE_FILE.exists():
-            raise RuntimeError("Clean baseline not found. Run clean first.")
-
-        with BASELINE_FILE.open() as f:
-            baseline = json.load(f)
-
-        clean_global = baseline.get("__global_activity__", None)
-
-        results = run_detector(baseline, toggles)
-
-        # ----------------------------------------------------
-        # GLOBAL ACTIVITY POSITIVE CONTROL
-        # ----------------------------------------------------
-        if clean_global is not None:
-            if total_activity > 1.5 * clean_global:
-                results["decision"]["trojan_detected"] = True
-                results["decision"]["confidence"] = "high"
-                results["decision"]["threshold"] = "global activity (1.5× clean)"
-
-    # --------------------------------------------------------
-    # Reporting
-    # --------------------------------------------------------
-    img_report = UnifiedImageReport(plots_dir)
-    txt_report = TextReportGenerator(summaries_dir)
-
-    img_report.generate(results)
-    txt_report.generate(results)
+    TextReportGenerator(out_dir / "summaries").generate(results)
+    UnifiedImageReport(out_dir / "plots").generate(results)
 
     print(f"[OK] Analysis complete for variant: {variant}")
 
