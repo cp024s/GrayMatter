@@ -1,5 +1,6 @@
 
-# Hardware Trojan Detection using Side-Channel Switching Activity
+# <div align="center">Hardware Trojan Detection using Side-Channel Switching Activity</div>
+---
 
 This project implements a **pre-silicon hardware Trojan detection framework** based on **per-signal switching activity analysis** extracted from RTL simulation waveforms.
 
@@ -189,9 +190,4 @@ make all
 
 ## 📌 Project Status
 
-<img src="https://img.shields.io/badge/Status-Complete-brightgreen" />
-<img src="https://img.shields.io/badge/Reproducible-Yes-success" />
-<img src="https://img.shields.io/badge/Automation-Full%20Pipeline-green" />
-<img src="https://img.shields.io/badge/Simulation-RTL%20(Icarus%20%7C%20Vivado)-orange" />
-<img src="https://img.shields.io/badge/Detection-Per--Signal%20Statistical-blue" />
-<img src="https://img.shields.io/badge/Scope-Pre--Silicon%20Security-informational" />
+<img src="https://img.shields.io/badge/Status-Complete-brightgreen" /> <img src="https://img.shields.io/badge/Reproducible-Yes-success" /> <img src="https://img.shields.io/badge/Automation-Full%20Pipeline-green" /> <img src="https://img.shields.io/badge/Simulation-RTL%20(Icarus%20%7C%20Vivado)-orange" /> <img src="https://img.shields.io/badge/Detection-Per--Signal%20Statistical-blue" /> <img src="https://img.shields.io/badge/Scope-Pre--Silicon%20Security-informational" />
