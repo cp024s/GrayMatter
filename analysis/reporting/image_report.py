@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import pandas as pd
 
+from analysis.monte_carlo import convergence
 import numpy as np
 import seaborn as sns
 
@@ -205,19 +206,39 @@ class UnifiedImageReport:
         ax.set_ylabel("Density")
         ax.legend()
 
-    def _draw_convergence(self, fig, grid_cell, results: dict):
-        ax = fig.add_subplot(grid_cell)
+    def _draw_convergence(self, fig, subplotspec, results):
+    # Always materialize an Axes from the SubplotSpec
+        ax = fig.add_subplot(subplotspec)
 
-        means = results["convergence"]["means"]
-        variances = results["convergence"]["variances"]
+        convergence = results.get("convergence", None)
 
-        ax.plot(means, label="Mean (μ)")
-        ax.plot(variances, label="Variance (σ²)")
+        if convergence is None:
+            ax.text(
+                0.5, 0.5,
+                "Convergence data not available",
+                ha="center",
+                va="center",
+                fontsize=10
+            )
+            ax.set_axis_off()
+            return
 
-        ax.set_title("Monte Carlo Convergence")
-        ax.set_xlabel("Batch Index")
+        means = convergence["means"]
+        variances = convergence["variances"]
+
+        ax.plot(means, label="Mean", linewidth=1.8)
+        ax.plot(variances, label="Variance", linewidth=1.8)
+        means = convergence["means"]
+        variances = convergence["variances"]
+
+        ax.plot(means, label="Mean", linewidth=1.8)
+        ax.plot(variances, label="Variance", linewidth=1.8)
+
+        ax.set_title("Baseline Convergence")
+        ax.set_xlabel("Samples")
         ax.set_ylabel("Value")
         ax.legend()
+        ax.grid(True, alpha=0.3)
 
     def _draw_anomaly_bars(self, fig, grid_cell, results: dict):
         ax = fig.add_subplot(grid_cell)
