@@ -4,53 +4,65 @@ import argparse
 import subprocess
 from pathlib import Path
 
+# -----------------------------------------------------------------------------
+# Project root
+# -----------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
 
+# -----------------------------------------------------------------------------
+# Fixed RTL paths
+# -----------------------------------------------------------------------------
 RTL_COMMON = ROOT / "rtl" / "common" / "alu_trojan_secure.v"
 RTL_CLEAN  = ROOT / "rtl" / "clean" / "alu_clean_secure.v"
 TB_FILE    = ROOT / "tb" / "tb_alu_secure.sv"
-
-RESULTS_DIR = ROOT / "results"
+RESULTS    = ROOT / "results"
 
 
 def build_iverilog_cmd(variant: str, out_dir: Path):
     cmd = ["iverilog", "-g2012"]
 
-    # ======================
+    # ---------------------------------------------------------
     # Macro control
-    # ======================
+    # ---------------------------------------------------------
     if variant != "clean":
         cmd += ["-DINCLUDE_TROJAN"]
         cmd += [f"-DTROJAN_{variant.upper()}"]
 
-    # ======================
-    # Output
-    # ======================
+    # ---------------------------------------------------------
+    # Output binary
+    # ---------------------------------------------------------
     sim_out = out_dir / "sim.out"
     cmd += ["-o", str(sim_out)]
 
-    # ======================
-    # RTL files (ORDER MATTERS)
-    # ======================
+    # ---------------------------------------------------------
+    # RTL (ORDER MATTERS)
+    # ---------------------------------------------------------
     cmd += [
         str(RTL_COMMON),
         str(RTL_CLEAN),
     ]
 
     if variant != "clean":
-        trojan_rtl = ROOT / "rtl" / "trojans" / variant / f"design_trojan_{variant}.v"
+        variant_num = variant[1:]  # v1 -> 1
+        trojan_rtl = (
+            ROOT
+            / "rtl"
+            / "trojans"
+            / f"variant_{variant_num}"
+            / f"design_trojan_variant_{variant_num}.v"
+        )
         cmd.append(str(trojan_rtl))
 
-    # ======================
-    # Testbench (LAST)
-    # ======================
+    # ---------------------------------------------------------
+    # Testbench LAST
+    # ---------------------------------------------------------
     cmd.append(str(TB_FILE))
 
     return cmd, sim_out
 
 
 def run_simulation(variant: str):
-    out_dir = RESULTS_DIR / variant
+    out_dir = RESULTS / variant
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[RUN] Variant : {variant}")
@@ -67,11 +79,12 @@ def run_simulation(variant: str):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Hardware Trojan experiment runner")
     parser.add_argument(
         "--variant",
+        required=True,
         choices=["clean", "v1", "v2", "v3"],
-        required=True
+        help="Design variant to simulate",
     )
     args = parser.parse_args()
 
