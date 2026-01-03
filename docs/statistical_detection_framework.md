@@ -1,4 +1,5 @@
-# Hardware Trojan Detection via Statistical Analysis of Switching Activity
+# <div align="center">Hardware Trojan Detection using Side-Channel Switching Activity</div>
+
 ---
 
 ## 1. Problem Statement
