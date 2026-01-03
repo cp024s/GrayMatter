@@ -1,4 +1,4 @@
-module alu_trojan_secure (
+module alu_trojan_variant0 (
     input  wire        clk,
     input  wire        rst_n,
     input  wire [3:0]  A,
