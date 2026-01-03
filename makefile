@@ -183,6 +183,9 @@ clean:
 	rm -rf $(SIM_DIR)/logs/*
 	rm -rf simv
 	@echo "[OK] Cleaned generated artifacts"
+	rm -rf a.out
+	rm -rf alu_secure.vcd
+	rm -rf results/
 
 wipe: clean clean_pycache
 	rm -rf $(RES_DIR)/*
