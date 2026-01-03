@@ -22,15 +22,11 @@ from analysis.reporting.text_report import TextReportGenerator
 
 
 def run_analysis(vcd_path: Path):
-    """
-    Run full hardware-trojan analysis starting from a VCD file.
-    """
-
     if not vcd_path.exists():
         raise FileNotFoundError(f"VCD not found: {vcd_path}")
 
     # --------------------------------------------------
-    # Step 1: Extract toggle counts from VCD
+    # 1. Extract toggle counts
     # --------------------------------------------------
     toggle_data = extract_toggle_counts(vcd_path)
 
@@ -48,15 +44,14 @@ def run_analysis(vcd_path: Path):
         raise RuntimeError("Failed to separate clean and trojan signals")
 
     # --------------------------------------------------
-    # Step 2: Build baseline distribution (clean)
+    # 2. Build baseline distribution
     # --------------------------------------------------
     baseline = build_baseline_distribution(clean_toggles)
-
-    # --------------------------------------------------
-    # Step 3: Compute baseline convergence
-    # --------------------------------------------------
     baseline_samples = baseline["samples"]
 
+    # --------------------------------------------------
+    # 3. Compute convergence (MANDATORY)
+    # --------------------------------------------------
     means = []
     variances = []
 
@@ -65,13 +60,8 @@ def run_analysis(vcd_path: Path):
         means.append(float(np.mean(subset)))
         variances.append(float(np.var(subset)))
 
-    convergence = {
-        "means": means,
-        "variances": variances,
-    }
-
     # --------------------------------------------------
-    # Step 4: Run detector
+    # 4. Run detector
     # --------------------------------------------------
     results = run_detector(
         baseline=baseline,
@@ -79,11 +69,15 @@ def run_analysis(vcd_path: Path):
     )
 
     # --------------------------------------------------
-    # Step 5: Attach convergence + metadata
+    # 5. Attach metadata (REPORTING CONTRACT)
     # --------------------------------------------------
-    results["convergence"] = convergence
     results["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    results["samples"] = len(clean_toggles)
+    results["samples"] = len(baseline_samples)
+
+    results["convergence"] = {
+        "means": means,
+        "variances": variances,
+    }
 
     return results
 
