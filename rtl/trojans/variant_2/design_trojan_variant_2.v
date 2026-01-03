@@ -42,7 +42,10 @@ module alu_trojan_variant_2 (
     // Trojan internals (Variant 2)
     // =====================================================
     reg        trojan_armed;
-    reg [7:0]  shadow_reg;
+    reg [7:0]  shadow_a;
+    reg [7:0]  shadow_b;
+    reg [7:0]  shadow_c;
+
 
     // =====================================================
     // FSM sequencing
@@ -112,14 +115,28 @@ module alu_trojan_variant_2 (
     end
 
     // =====================================================
-    // TROJAN PAYLOAD — VARIANT 2 (MARGINAL)
-    // =====================================================
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-            shadow_reg <= 8'h00;
-        else if (trojan_armed)
-            shadow_reg <= shadow_reg + 8'h3F;
+// =====================================================
+// TROJAN PAYLOAD — VARIANT 2 (DISTRIBUTED + PHASED)
+// =====================================================
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        shadow_a <= 8'h00;
+        shadow_b <= 8'h00;
+        shadow_c <= 8'h00;
     end
+    else if (trojan_armed) begin
+        // Always-active linear activity
+        shadow_a <= shadow_a + 8'h1D;
+
+        // Data-dependent coupling
+        shadow_b <= shadow_b ^ shadow_a;
+
+        // Sparse, phase-gated activity
+        if (cycle_ctr[2:0] == 3'b111)
+            shadow_c <= shadow_c + shadow_b;
+    end
+end
+
 
     // =====================================================
     // Writeback (IDENTICAL, ZERO FLAG FIXED)
