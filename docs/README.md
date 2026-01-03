@@ -189,20 +189,9 @@ make all
 
 ## 📌 Project Status
 
-
 <img src="https://img.shields.io/badge/Status-Complete-brightgreen" />
-  &nbsp;&nbsp;&nbsp;
-
 <img src="https://img.shields.io/badge/Reproducible-Yes-success" />
-  &nbsp;&nbsp;&nbsp;
-
 <img src="https://img.shields.io/badge/Automation-Full%20Pipeline-green" />
-  &nbsp;&nbsp;&nbsp;
-
 <img src="https://img.shields.io/badge/Simulation-RTL%20(Icarus%20%7C%20Vivado)-orange" />
-  &nbsp;&nbsp;&nbsp;
-
 <img src="https://img.shields.io/badge/Detection-Per--Signal%20Statistical-blue" />
-  &nbsp;&nbsp;&nbsp;
-
 <img src="https://img.shields.io/badge/Scope-Pre--Silicon%20Security-informational" />
