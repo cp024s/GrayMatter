@@ -11,13 +11,18 @@ module alu_trojan_secure (
 );
 
 `ifdef INCLUDE_TROJAN
+
     `ifdef TROJAN_V1
         alu_trojan_variant_1 impl (.*);
     `elsif TROJAN_V2
         alu_trojan_variant_2 impl (.*);
-    `else
+    `elsif TROJAN_V3
         alu_trojan_variant_3 impl (.*);
+    `else
+        // Safety fallback
+        alu_clean_secure impl (.*);
     `endif
+
 `else
     alu_clean_secure impl (.*);
 `endif
