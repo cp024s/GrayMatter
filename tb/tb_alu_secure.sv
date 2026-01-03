@@ -38,7 +38,7 @@ module tb_alu_secure;
     logic       overflow_trojan;
 
     // ===============================
-    // CLEAN DUT (ALWAYS PRESENT)
+    // CLEAN DUT
     // ===============================
     alu_clean_secure u_clean (
         .clk      (clk),
@@ -53,7 +53,7 @@ module tb_alu_secure;
     );
 
     // ===============================
-    // TROJAN DUT (ONLY WHEN ENABLED)
+    // TROJAN DUT (OPTIONAL)
     // ===============================
 `ifdef INCLUDE_TROJAN
     alu_trojan_secure u_trojan (
@@ -68,7 +68,6 @@ module tb_alu_secure;
         .overflow (overflow_trojan)
     );
 `else
-    // Dummy values so analysis code never breaks
     assign result_trojan   = 4'b0;
     assign carry_trojan    = 1'b0;
     assign zero_trojan     = 1'b0;
@@ -100,20 +99,32 @@ module tb_alu_secure;
     end
 
     // ===============================
-    // Stimulus
+    // Stimulus (FIXED)
     // ===============================
     int unsigned seed;
 
     initial begin
+        // Default seed
         seed = 32'hC0FFEE;
+
+        // Override from plusarg
+        if ($value$plusargs("SEED=%d", seed)) begin
+            $display("[TB] Using SEED = %0d", seed);
+        end else begin
+            $display("[TB] Using default SEED = %0d", seed);
+        end
+
+        // Seed RNG ONCE (iverilog-safe)
+        seed = $urandom(seed);
+
         wait (rst_n);
 
         for (int i = 0; i < NUM_CYCLES; i++) begin
             @(posedge clk);
             if (u_clean.state == u_clean.IDLE) begin
-                A  <= $urandom(seed) & 4'hF;
-                B  <= $urandom(seed) & 4'hF;
-                op <= $urandom(seed) & 2'h3;
+                A  <= $urandom() & 4'hF;
+                B  <= $urandom() & 4'hF;
+                op <= $urandom() & 2'h3;
             end
         end
 
@@ -121,5 +132,6 @@ module tb_alu_secure;
         $display("Simulation completed: %0d cycles", NUM_CYCLES);
         $finish;
     end
+
 
 endmodule
